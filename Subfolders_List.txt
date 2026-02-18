@@ -1,0 +1,28 @@
+Folder Deep Inventory (Names Only)
+Folder Name: uartProject
+Generated: 2026-02-10 19:22:59
+
+Direct Subfolder Count: 0
+Direct File Count: 9
+All Nested Subfolder Count: 0
+All Nested File Count: 9
+
+Direct Subfolders (Names):
+- None
+
+Direct Files (Names):
+- baud_rate_generator.v
+- PROJECT_INTRODUCTION.md
+- PROJECT_QA.md
+- uart_fifo.v
+- UART_PROJECT_NOTES.md
+- uart_receiver.v
+- uart_sender.v
+- uart_top_tb.v
+- uart_top.v
+
+All Subfolder Names (Recursive):
+- None
+
+Contents Inside Each Subfolder (Names Only):
+- No subfolders found.
