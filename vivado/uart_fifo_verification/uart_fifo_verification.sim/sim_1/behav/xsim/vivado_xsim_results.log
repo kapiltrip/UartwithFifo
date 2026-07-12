@@ -1,0 +1,52 @@
+#-----------------------------------------------------------
+# xsim v2024.1 (64-bit)
+# SW Build 5076996 on Wed May 22 18:37:14 MDT 2024
+# IP Build 5075265 on Wed May 22 21:45:21 MDT 2024
+# SharedData Build 5076995 on Wed May 22 18:29:18 MDT 2024
+# Start of session at: Sat Jul 11 09:41:10 2026
+# Process ID: 8924
+# Current directory: C:/Users/kapil/OneDrive/Desktop/uartProject/vivado/uart_fifo_verification/uart_fifo_verification.sim/sim_1/behav/xsim
+# Command line: xsim.exe -log vivado_xsim_results.log -mode tcl -source {xsim.dir/uart_top_tb_behav/xsim_script.tcl}
+# Log file: C:/Users/kapil/OneDrive/Desktop/uartProject/vivado/uart_fifo_verification/uart_fifo_verification.sim/sim_1/behav/xsim/vivado_xsim_results.log
+# Journal file: C:/Users/kapil/OneDrive/Desktop/uartProject/vivado/uart_fifo_verification/uart_fifo_verification.sim/sim_1/behav/xsim\xsim.jou
+# Running On        :LAPTOP-MQE0EFU0
+# Platform          :Windows Server 2016 or Windows 10
+# Operating System  :26200
+# Processor Detail  :Intel(R) Core(TM) i5-1035G1 CPU @ 1.00GHz
+# CPU Frequency     :1190 MHz
+# CPU Physical cores:4
+# CPU Logical cores :8
+# Host memory       :8375 MB
+# Swap memory       :7561 MB
+# Total Virtual     :15937 MB
+# Available Virtual :5688 MB
+#-----------------------------------------------------------
+source xsim.dir/uart_top_tb_behav/xsim_script.tcl
+# xsim {uart_top_tb_behav} -autoloadwcfg -tclbatch {uart_top_tb.tcl}
+Time resolution is 1 ps
+source uart_top_tb.tcl
+## set curr_wave [current_wave_config]
+## if { [string length $curr_wave] == 0 } {
+##   if { [llength [get_objects]] > 0} {
+##     add_wave /
+##     set_property needs_save false [current_wave_config]
+##   } else {
+##      send_msg_id Add_Wave-1 WARNING "No top level signals found. Simulator will start without a wave window. If you want to open a wave window go to 'File->New Waveform Configuration' or type 'create_wave_config' in the TCL console."
+##   }
+## }
+## run all
+TEST_CASE TC01 PASS reset and idle checks at 10 ns
+TEST_CASE TC02 PASS single byte A5 at 350 ns
+TEST_CASE TC03 PASS all-zero byte at 670 ns
+TEST_CASE TC04 PASS all-one byte at 990 ns
+TEST_CASE TC05 PASS alternating patterns at 1630 ns
+TEST_CASE TC06 PASS TX FIFO accepted six-byte burst at 3547 ns
+TEST_CASE TC07 PASS RX FIFO hold and ordered reads at 3590 ns
+TEST_CASE TC08 PASS reset flush during transfer at 3606 ns
+TEST_CASE TC09 PASS post-reset recovery at 3946 ns
+TEST_CASE TC10 PASS FIFO full and overflow protection at 4078 ns
+TEST_CASE TC11 PASS simultaneous FIFO read and write at 4090 ns
+TEST_CASE TC12 PASS FIFO wrap-around reuse at 4098 ns
+UART_FIFO_VERIFICATION_PASS: all 12 test cases passed at 4098 ns
+$finish called at time : 4098 ns : File "C:/Users/kapil/OneDrive/Desktop/uartProject/rtlCode/uart_top_tb.v" Line 277
+xsim% INFO: [Common 17-206] Exiting xsim at Sat Jul 11 09:41:17 2026...

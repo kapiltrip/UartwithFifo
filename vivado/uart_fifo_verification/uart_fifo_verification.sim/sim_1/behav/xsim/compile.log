@@ -1,0 +1,12 @@
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/kapil/OneDrive/Desktop/uartProject/rtlCode/baud_rate_generator.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module baud_rate_generator
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/kapil/OneDrive/Desktop/uartProject/rtlCode/uart_fifo.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module uart_fifo
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/kapil/OneDrive/Desktop/uartProject/rtlCode/uart_receiver.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module uart_receiver
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/kapil/OneDrive/Desktop/uartProject/rtlCode/uart_sender.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module uart_sender
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/kapil/OneDrive/Desktop/uartProject/rtlCode/uart_top.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module uart_top
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/kapil/OneDrive/Desktop/uartProject/rtlCode/uart_top_tb.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module uart_top_tb

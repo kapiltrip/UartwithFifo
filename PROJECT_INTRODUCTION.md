@@ -1,4 +1,4 @@
-# UART Transceiver (Pure Verilog) with Baud Generator + TX FIFO
+# UART Transceiver (Pure Verilog) with Baud Generator + TX/RX FIFOs
 ## Project Introduction (Report/Presentation Ready)
 
 ### 1) Why this project matters
@@ -23,7 +23,8 @@ This repository implements an **8‑N‑1 UART** (8 data bits, no parity, 1 stop
 - A **UART transmitter** FSM (`uart_sender`) that frames and serializes a byte:
   - start bit (`0`) -> 8 data bits (LSB first) -> stop bit (`1`)
 - A **UART receiver** FSM (`uart_receiver`) that oversamples the serial line and reconstructs the byte
-- A **16‑deep, 8‑bit synchronous FIFO** (`uart_fifo`) placed on the transmit side so the “user” can write back‑to‑back bytes even while the line is busy
+- A **16‑deep, 8‑bit synchronous FIFO** (`uart_fifo`) on the transmit side so the “user” can write back‑to‑back bytes even while the line is busy
+- A second **16‑deep, 8‑bit synchronous FIFO** on the receive side so completed bytes remain ordered and available until the user reads them
 - A **top module** (`uart_top`) that integrates everything into a clean interface for simulation/demo
 - A **self-checking testbench** (`uart_top_tb`) that stress-tests back-to-back writes and verifies ordering and reset behavior
 
@@ -38,7 +39,7 @@ At a block level, the design separates concerns: timing generation, transmit fra
 ```
 Parallel user writes           Serial line                  Parallel received byte
 -------------------          -------------                 -----------------------
-data_in + write_enable --> [ TX FIFO ] --> [ UART TX ] --> tx_line --> [ UART RX ] --> data_out + ready
+data_in + write_enable --> [ TX FIFO ] --> [ UART TX ] --> tx_line --> [ UART RX ] --> [ RX FIFO ] --> data_out + ready
                                  ^             ^                          ^
                                  |             |                          |
                              tx_start      tx_enable                   rx_enable
@@ -67,12 +68,14 @@ The receiver uses a 4-bit `sample` counter to walk through 16 sub-samples per bi
 
 Even though this implementation is intentionally lightweight (no majority vote, no explicit framing error flag), it demonstrates the industry-standard principle: **oversample fast, sample near the center**.
 
-#### C) FIFO buffering to solve rate mismatch
+#### C) FIFO buffering on both sides to solve rate mismatch
 
-The FIFO in `uart_fifo.v` is a key “system” upgrade. Without buffering, the user must wait for `busy` to go low before issuing every write. With buffering:
+The reusable FIFO in `uart_fifo.v` is a key “system” upgrade. Without TX buffering, the user must wait for `busy` to go low before issuing every write. Without RX buffering, an unread byte can be overwritten by a later frame. With buffering on both sides:
 
 - The user can assert `write_enable` on consecutive cycles.
 - The transmitter pops exactly one byte when it becomes idle (`tx_start`).
+- The receiver automatically enqueues every completed byte.
+- The consumer can delay reads and later pop the bytes in their original order.
 
 This is the core idea behind many real peripherals: **decouple producer and consumer rates** and keep the slow interface busy while allowing fast bursts on the system side.
 
@@ -83,8 +86,9 @@ On the TX side:
 - `busy` indicates the transmitter is actively sending a frame.
 
 On the RX side:
-- `ready` marks that a full byte is captured in `data_out`.
-- `ready_clear` is an explicit “acknowledge” from the user to drop `ready` and prepare for the next byte.
+- `ready` marks that at least one byte is available in the RX FIFO.
+- `data_out` shows the oldest unread byte.
+- `ready_clear` pops exactly one byte from the RX FIFO.
 
 This makes the module behavior very easy to describe in a viva: write bytes in, receive bytes out, with simple “valid/ack” style signals.
 
@@ -97,7 +101,9 @@ The project includes a targeted testbench (`uart_top_tb.v`) designed to validate
 1. **Basic end-to-end correctness**: a sent byte is received unchanged.
 2. **Ordering**: multiple bytes are received in the same order they were written.
 3. **FIFO buffering behavior**: back-to-back writes are accepted even while the transmitter is busy.
-4. **Reset robustness**: the design resets cleanly after activity and continues working.
+4. **RX FIFO buffering**: multiple received bytes can wait without being read and are later popped in order.
+5. **Reset robustness**: the design resets cleanly during activity and continues working afterward.
+6. **FIFO edge behavior**: full protection, simultaneous read/write, and pointer wrap-around are checked.
 
 The testbench uses small tasks (`send_byte`, `expect_byte`, `clear_ready`) to express intent clearly. It is “self-checking”: it stops the simulation if the received byte does not match the expected value.
 
@@ -114,11 +120,11 @@ If you need to present this project clearly, use this structure:
 3. **Key technical idea**
    - “The baud generator produces enable pulses so my TX/RX FSMs are tick-driven, not cycle-counting everywhere.”
 4. **System-level feature**
-   - “I added a 16-byte TX FIFO so the user can write bursts faster than the UART line rate.”
+   - “I added separate 16-byte TX and RX FIFOs so producer bursts and delayed consumer reads do not disturb byte ordering.”
 5. **Proof**
    - “I built a loopback top and a self-checking testbench that sends multiple bytes back-to-back, verifies order, and tests reset.”
 6. **Awareness / Future work**
-   - “To harden it for real hardware, I’d add an RX input synchronizer, framing error detection, and likely an RX FIFO.”
+   - “To harden it for real hardware, I’d add an RX input synchronizer, framing/parity error outputs, and visible FIFO status/backpressure.”
 
 This framing shows not only that the code works, but that you understand *why* the structure is correct and how to evolve it.
 
@@ -131,7 +137,7 @@ This project is intentionally focused on core UART concepts. As a result:
 - The top module uses **internal loopback** and does not expose external `tx`/`rx` pins yet.
 - RX does not report **framing errors** (stop-bit validity) and does not implement parity.
 - RX assumes the input is reasonably clean (no synchronizer/majority vote), which is fine for loopback simulation but should be improved for true asynchronous external RX pins.
-- The TX FIFO currently drops writes when full (it has `full` internally, but `uart_top` does not export backpressure yet).
+- FIFO full flags are internal, so `uart_top` does not yet expose backpressure or overflow status to external logic.
 
 These are good “next steps” items and show strong engineering judgment when you mention them.
 
@@ -139,4 +145,4 @@ These are good “next steps” items and show strong engineering judgment when 
 
 ### 8) Conclusion
 
-This project demonstrates a complete, modular UART implementation in Verilog: timing generation, TX/RX finite state machines, oversampling-based reception, FIFO buffering for rate mismatch, and a self-checking verification environment. The result is a practical communication subsystem that’s easy to understand, test, and extend into a hardware-ready peripheral.
+This project demonstrates a complete, modular UART implementation in Verilog: timing generation, TX/RX finite state machines, oversampling-based reception, FIFO buffering on both sides, and a self-checking verification environment. The result is a practical communication subsystem that’s easy to understand, test, and extend into a hardware-ready peripheral.

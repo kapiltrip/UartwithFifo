@@ -13,14 +13,15 @@ This file explains what **each module and variable/signal** in this project is d
     - `rx_enable` for the receiver (oversampling pulses, 16x faster)
   - `uart_sender` converts **parallel byte ? serial TX line**
   - `uart_receiver` converts **serial RX line ? parallel byte**
+  - A second `uart_fifo` instance buffers completed receive bytes until the user reads them
 - In this project, `uart_sender.tx` is directly wired to `uart_receiver.rx` (loopback inside `uart_top`).
 
 **Signals at a glance**
 
 ```
 uart_top_tb
-  data_in, write_enable  ---> uart_top ---> uart_sender ---> tx_line ---> uart_receiver ---> data_out, ready
-  ready_clear            ---> uart_top -------------------------------> uart_receiver
+  data_in, write_enable  ---> uart_top ---> TX FIFO ---> uart_sender ---> tx_line ---> uart_receiver ---> RX FIFO ---> data_out, ready
+  ready_clear            ---> uart_top ---------------------------------------------------------------> RX FIFO pop
 
 baud_rate_generator
   tx_enable -------------> uart_sender
@@ -156,10 +157,11 @@ Key idea: **oversampling**.
   - Temporary storage while receiving the byte.
   - After stop state completes, `data_out <= temp`.
 
-### How `ready` works here
+### How receiver completion works
 
-- `ready` is set to `1` at the end of a successful stop-bit period.
-- `ready` stays `1` until the testbench/user asserts `ready_clear = 1` for a clock.
+- The receiver's internal `ready` is set at the end of a successful stop-bit period.
+- `uart_top` writes that completed byte into the RX FIFO and uses the same capture pulse to clear the receiver's internal ready flag.
+- The top-level `ready` output is high whenever the RX FIFO is not empty.
 
 ## 4) `uart_top` (Wiring / Integration)
 
@@ -173,7 +175,7 @@ It instantiates and connects:
 - `uart_sender`
 - `uart_receiver`
 
-It also creates the internal wires that connect them together.
+It also creates the internal wires that connect them together and instantiates one FIFO on each side of the UART.
 
 ### Ports
 
@@ -240,7 +242,7 @@ It simulates a user:
   - Pulses `ready_clear` for 1 cycle to clear the receiver?s `ready` flag.
 
 
-## 6) FIFO Buffering (TX FIFO)
+## 6) FIFO Buffering (TX and RX FIFOs)
 
 This project now includes a **minimal TX FIFO** so the "user side" (testbench / CPU) can write bytes faster than the UART line can transmit.
 
@@ -258,4 +260,11 @@ This project now includes a **minimal TX FIFO** so the "user side" (testbench / 
     - transmitter `write_enable = tx_start` starts the UART frame
 
 This is the "FIFO buffering to handle rate mismatch" part: **the testbench can push bytes back-to-back even while the transmitter is busy.**
+
+On the receive side, each completed `uart_receiver` byte is written into a second `uart_fifo` instance:
+
+- Top-level `ready` is `1` whenever the RX FIFO is not empty.
+- `data_out` always shows the oldest unread byte (show-ahead output).
+- Each `ready_clear` pulse pops one byte, so queued bytes advance in order.
+- If the RX FIFO is full, the receiver's completion flag is held until space becomes available.
 

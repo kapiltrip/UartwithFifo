@@ -18,7 +18,6 @@ module uart_top #(
     wire tx_line;
 
     // TX FIFO (buffers user writes so they can be faster than UART line rate)
-    wire tx_fifo_full;
     wire tx_fifo_empty;
     wire [7:0] tx_fifo_dout;
 
@@ -43,7 +42,7 @@ module uart_top #(
         .reset(reset),
         .wr_en(wr_en),
         .wr_data(data_in),
-        .full(tx_fifo_full),
+        .full(),
         .rd_en(tx_start),
         .rd_data(tx_fifo_dout),
         .empty(tx_fifo_empty)
@@ -62,13 +61,41 @@ module uart_top #(
     // Keep original meaning: `busy` = transmitter busy.
     assign busy = tx_busy;
 
+    // RX FIFO (stores complete received bytes until the user reads them).
+    wire rx_byte_ready;
+    wire [7:0] rx_byte;
+    wire rx_fifo_full;
+    wire rx_fifo_empty;
+    wire [7:0] rx_fifo_dout;
+
+    // Capture each receiver result once. If the FIFO is full, the receiver
+    // keeps rx_byte_ready asserted until a FIFO location becomes available.
+    wire rx_fifo_write = rx_byte_ready && !rx_fifo_full;
+    wire rx_fifo_read = rdy_clr && !rx_fifo_empty;
+
     uart_receiver rx_inst (
         .clk(clk),
         .rst(reset),
         .rx(tx_line),
-        .rdy_clr(rdy_clr),
+        .rdy_clr(rx_fifo_write),
         .rx_en(rx_en),
-        .rdy(rdy),
-        .data_out(data_out)
+        .rdy(rx_byte_ready),
+        .data_out(rx_byte)
     );
+
+    uart_fifo rx_fifo (
+        .clk(clk),
+        .reset(reset),
+        .wr_en(rx_fifo_write),
+        .wr_data(rx_byte),
+        .full(rx_fifo_full),
+        .rd_en(rx_fifo_read),
+        .rd_data(rx_fifo_dout),
+        .empty(rx_fifo_empty)
+    );
+
+    // Preserve the original user interface: rdy means at least one byte is
+    // buffered, data_out shows the oldest byte, and rdy_clr consumes it.
+    assign rdy = !rx_fifo_empty;
+    assign data_out = rx_fifo_dout;
 endmodule
