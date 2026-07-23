@@ -29,15 +29,15 @@ module uart_sender (
         end else begin
             case (state)
                 IDLE: begin
-                    tx <= 1'b1;
+                    tx <= 1'b1;  // ideally this is 1 , and when its, 0 rx goes to the start state to sample .
                     index <= 3'd0;
-                    if (wr_en) begin
+                    if (wr_en) begin      // wr_en is from the tb
                         data <= data_in;
                         state <= START;
                     end
                 end
 
-                START: begin
+                START: begin  // essentially the start  bit
                     if (tx_en) begin
                         tx <= 1'b0;
                         state <= DATA;
@@ -57,7 +57,7 @@ module uart_sender (
                 end
 
                 STOP: begin
-                    if (tx_en) begin
+                    if (tx_en) begin   //stop bit counted
                         tx <= 1'b1;
                         state <= IDLE;
                     end

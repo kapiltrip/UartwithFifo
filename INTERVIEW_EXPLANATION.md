@@ -30,7 +30,7 @@ data_in + wr_en                                    data_out + rdy/rdy_clr
  [16x8 TX FIFO] -> [UART TX FSM] -> serial line -> [UART RX FSM] -> [16x8 RX FIFO]
                          ^                           ^
                          |                           |
-                     tx_enable                  rx_enable (16x)
+                       tx_en                    rx_enable (16x)
                          \___________________________/
                                   |
                          [baud_rate_generator]
@@ -43,7 +43,7 @@ The most important system idea is rate decoupling. A CPU can enqueue bytes in a 
 ### `baud_rate_generator.v`
 
 - Counts the fast system clock.
-- Produces `tx_enable` once per UART bit time.
+- Produces `tx_en` once per UART bit time.
 - Produces `rx_en` 16 times per UART bit time.
 - Keeps baud timing separate from protocol state, so the TX and RX FSMs only move on enable pulses.
 

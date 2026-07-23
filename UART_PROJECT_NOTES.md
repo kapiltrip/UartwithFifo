@@ -9,7 +9,7 @@ This file explains what **each module and variable/signal** in this project is d
 - `uart_top_tb` (testbench) drives **parallel** data into `uart_top`.
 - `uart_top` connects the sub-modules:
   - `baud_rate_generator` creates timing pulses:
-    - `tx_enable` for the transmitter (1 pulse per UART bit time)
+    - `tx_en` for the transmitter (1 pulse per UART bit time)
     - `rx_enable` for the receiver (oversampling pulses, 16x faster)
   - `uart_sender` converts **parallel byte ? serial TX line**
   - `uart_receiver` converts **serial RX line ? parallel byte**
@@ -24,7 +24,7 @@ uart_top_tb
   ready_clear            ---> uart_top ---------------------------------------------------------------> RX FIFO pop
 
 baud_rate_generator
-  tx_enable -------------> uart_sender
+  tx_en -----------------> uart_sender
   rx_enable -------------> uart_receiver
 ```
 
@@ -36,7 +36,7 @@ baud_rate_generator
 
 It converts the fast reference clock (`clk`, e.g. 50 MHz) into:
 
-- `tx_enable`: a **1-clock-cycle pulse** that occurs once per UART bit time (baud tick).
+- `tx_en`: a **1-clock-cycle pulse** that occurs once per UART bit time (baud tick).
 - `rx_enable`: a **1-clock-cycle pulse** that occurs 16x faster (oversampling tick).
 
 The UART TX/RX logic only ?moves forward? when these enable pulses happen.
@@ -45,7 +45,7 @@ The UART TX/RX logic only ?moves forward? when these enable pulses happen.
 
 - `clk` (input): your fast reference clock.
 - `reset` (input): resets counters and outputs.
-- `tx_enable` (output reg): goes to `uart_sender.tx_enable`.
+- `tx_en` (output reg): goes to `uart_sender.tx_en`.
 - `rx_enable` (output reg): goes to `uart_receiver.rx_enable`.
 
 ### Parameters (tuning numbers)
@@ -58,7 +58,7 @@ The UART TX/RX logic only ?moves forward? when these enable pulses happen.
 ### Internal variables (what each one does)
 
 - `tx_counter` (reg [12:0]): counts `clk` cycles from `0` up to `TX_DIV-1`.
-  - When it hits `TX_DIV-1`, it resets back to 0 and makes `tx_enable = 1` for one clock.
+  - When it hits `TX_DIV-1`, it resets back to 0 and makes `tx_en = 1` for one clock.
 - `rx_counter` (reg [9:0]): counts `clk` cycles from `0` up to `RX_DIV-1`.
   - When it hits `RX_DIV-1`, it resets back to 0 and makes `rx_enable = 1` for one clock.
 
@@ -74,14 +74,14 @@ It sends a standard UART frame:
 - 8 data bits: LSB first (`data[0]` then `data[1]` ... `data[7]`)
 - Stop bit: `1`
 
-It only changes the output `tx` when `tx_enable` is pulsed by `baud_rate_generator`.
+It only changes the output `tx` when `tx_en` is pulsed by `baud_rate_generator`.
 
 ### Ports (signals that connect to other modules)
 
 - `clk` (input): reference clock.
 - `reset` (input): puts transmitter into idle (line high).
 - `write_enable` (input): **from testbench/top**; tells transmitter ?load this byte and start?.
-- `tx_enable` (input): **from `baud_rate_generator`**; 1-cycle pulse at baud rate.
+- `tx_en` (input): **from `baud_rate_generator`**; 1-cycle pulse at baud rate.
 - `data_in` (input [7:0]): **from testbench/top**; the byte you want to send.
 - `tx` (output reg): the serial UART TX line.
 - `busy` (output): high when the transmitter is not idle.
@@ -91,8 +91,8 @@ It only changes the output `tx` when `tx_enable` is pulsed by `baud_rate_generat
 These are constants used to label the FSM states:
 
 - `IDLE`: waiting for `write_enable`.
-- `START`: waiting for a `tx_enable` tick to output the start bit.
-- `DATA`: outputs 8 data bits (LSB first), one bit per `tx_enable`.
+- `START`: waiting for a `tx_en` tick to output the start bit.
+- `DATA`: outputs 8 data bits (LSB first), one bit per `tx_en`.
 - `STOP`: outputs stop bit, then returns to `IDLE`.
 
 ### Internal variables (what each one does)
@@ -122,7 +122,7 @@ Key idea: **oversampling**.
 
 - `rx_enable` pulses 16x per UART bit.
 - The receiver uses a `sample` counter (0..15).
-- It samples the data around the **middle of each bit** (in this code: when `sample == 7`).
+- It validates the start bit around its middle when `sample == 7`. After that alignment, it samples each data bit when `sample == 15`, one complete 16-tick bit period later.
 
 ### Ports (signals that connect to other modules)
 
@@ -137,7 +137,7 @@ Key idea: **oversampling**.
 
 ### State machine (FSM) parameters
 
-- `START`: wait for start bit (`rx == 0`) and ?walk through? one full bit time.
+- `START`: after detecting `rx == 0`, wait about half a bit period and check that the start bit is still low.
 - `DATA`: oversample each data bit, store 8 bits into `temp`.
 - `STOP`: wait through the stop-bit time, then assert `ready`.
 
@@ -147,12 +147,14 @@ Key idea: **oversampling**.
   - Current receiver FSM state (`START/DATA/STOP`).
 - `sample` (reg [3:0]):
   - Counts oversampling ticks from 0 ? 15 for each bit time.
-  - In `DATA`, when `sample == 7`, we sample `rx` (middle of the bit).
+  - In `START`, `sample == 7` validates the middle of the possible start bit.
+  - After that alignment, `DATA` captures `rx` at `sample == 15`, placing successive captures one full bit period apart and approximately at each data bit's middle.
   - In several transitions we reset it back to 0.
-- `index` (reg [3:0]):
-  - Counts how many data bits have been collected.
-  - Goes 0 ? 8 (8 bits total).
-  - We store bits into `temp[index[2:0]]`.
+- `index` (reg [2:0]):
+  - Selects which of the eight data-bit positions is currently being collected.
+  - It counts from 0 through 7, so three bits are sufficient; the receiver changes to `STOP` when `index == 7` and never needs to store 8.
+  - We store the one-bit `rx` value into the selected one-bit location with `temp[index] <= rx`.
+  - An earlier version declared `index` as four bits and used only `index[2:0]`. The unused most-significant bit was unnecessary, so the declaration and constants were corrected to three bits.
 - `temp` (reg [7:0]):
   - Temporary storage while receiving the byte.
   - After stop state completes, `data_out <= temp`.
@@ -162,6 +164,51 @@ Key idea: **oversampling**.
 - The receiver's internal `ready` is set at the end of a successful stop-bit period.
 - `uart_top` writes that completed byte into the RX FIFO and uses the same capture pulse to clear the receiver's internal ready flag.
 - The top-level `ready` output is high whenever the RX FIFO is not empty.
+
+### Receiver counters: questions and answers
+
+#### Q: `rx` is one bit, so why does `temp[index] <= rx` put it into an 8-bit register?
+
+It does not write `rx` into all eight bits. `index` selects exactly one bit of `temp`, so `temp[index]` is a one-bit destination. For example, if `index == 3'd5`, the assignment is equivalent to `temp[5] <= rx`.
+
+#### Q: Why is `index` three bits?
+
+The receiver needs to select `temp[0]` through `temp[7]`. Three bits represent the eight values 0 through 7. When `index == 7`, the FSM enters `STOP` instead of incrementing the counter, so `index` never needs to represent 8. The earlier four-bit declaration had an unused most-significant bit and was corrected.
+
+#### Q: Why are `sample` and `index` set to zero in `IDLE` if they are not used there?
+
+Zeroing them prepares deterministic starting values for the next frame. `sample <= 4'd0` ensures start-bit timing begins from a known point. `index <= 3'd0` prepares the first destination as `temp[0]`; however, this particular code also resets `index` when a valid start bit enters `DATA`, so the `IDLE` assignment to `index` is defensive but technically redundant.
+
+The syntax sets zero, not one:
+
+```verilog
+sample <= 4'd0; // 0000
+index  <= 3'd0; // 000
+```
+
+#### Q: Why are the counters not continuously reset in `STOP` too?
+
+`STOP` actively uses `sample` to measure the stop-bit period. If every `STOP` cycle assigned `sample <= 0`, it could never reach 15 and the FSM would remain stuck in `STOP`. Instead, it increments during the state and resets to zero only when the stop-bit period finishes:
+
+```verilog
+sample <= sample + 4'd1;
+if (sample == 4'd15) begin
+    sample <= 4'd0;
+    state  <= IDLE;
+end
+```
+
+`index` is not used in `STOP`, so it may safely remain 7. It is reset before the next byte is collected. Resetting it once while leaving `STOP` would also be harmless, but it is unnecessary.
+
+#### Q: If `sample` already starts at zero, why increment it in `START`?
+
+The value zero is only the counter's starting value; it does not mean that an oversampling interval has elapsed. `rx_enable` produces 16 timing pulses per UART bit. `IDLE` first observes `rx == 0` on one of those pulses and treats it as a possible start bit. Subsequent `rx_enable` pulses increment `sample` so the receiver can measure approximately half a bit period before validating that `rx` is still low.
+
+Because these are nonblocking assignments (`<=`), the condition reads the counter's old value. The `START` state sees old values 0, 1, ..., 7. When the old value is 7, eight `rx_enable` pulses have elapsed, so the receiver checks approximately the middle of the start bit. A high `rx` at that point indicates a likely noise pulse rather than a valid start bit.
+
+After validating the start bit, the receiver resets `sample` to zero. The `DATA` state then waits 16 more `rx_enable` pulses and captures data bit 0 when the old counter value reaches 15. That places the capture approximately one full UART bit after the start-bit midpoint, which is the midpoint of data bit 0.
+
+The counter is not incremented only in `START`: it also increments in `DATA` to space data-bit captures and in `STOP` to measure the stop-bit period. Also note that `<=` is the Verilog nonblocking-assignment operator; it is not the shift-assignment operator `<<=`.
 
 ## 4) `uart_top` (Wiring / Integration)
 
@@ -190,7 +237,7 @@ It also creates the internal wires that connect them together and instantiates o
 ### Internal wires (what each one does)
 
 - `tx_clock_enable` (wire):
-  - From `baud_rate_generator.tx_enable` to `uart_sender.tx_enable`.
+  - From `baud_rate_generator.tx_en` to `uart_sender.tx_en`.
 - `rx_clock_enable` (wire):
   - From `baud_rate_generator.rx_enable` to `uart_receiver.rx_enable`.
 - `tx_line` (wire):

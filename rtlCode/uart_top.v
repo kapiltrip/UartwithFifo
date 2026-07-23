@@ -13,7 +13,7 @@ module uart_top #(
     output busy,
     output [7:0] data_out
 );
-    wire tx_clock_enable;
+    wire tx_en;
     wire rx_en;
     wire tx_line;
 
@@ -33,7 +33,7 @@ module uart_top #(
     ) brg (
         .clk(clk),
         .reset(reset),
-        .tx_enable(tx_clock_enable),
+        .tx_en(tx_en),
         .rx_en(rx_en)
     );
 
@@ -52,7 +52,7 @@ module uart_top #(
         .clk(clk),
         .rst(reset),
         .wr_en(tx_start),
-        .tx_en(tx_clock_enable),
+        .tx_en(tx_en),
         .data_in(tx_fifo_dout),
         .tx(tx_line),
         .busy(tx_busy)
@@ -96,6 +96,6 @@ module uart_top #(
 
     // Preserve the original user interface: rdy means at least one byte is
     // buffered, data_out shows the oldest byte, and rdy_clr consumes it.
-    assign rdy = !rx_fifo_empty;
+    assign rdy = !rx_fifo_empty;  //? use of this rdy ?
     assign data_out = rx_fifo_dout;
 endmodule

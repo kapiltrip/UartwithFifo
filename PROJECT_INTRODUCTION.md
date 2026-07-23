@@ -18,7 +18,7 @@ This project implements a complete UART data path in **pure Verilog**, showing h
 This repository implements an **8‑N‑1 UART** (8 data bits, no parity, 1 stop bit) using a modular RTL architecture:
 
 - A **baud-rate pulse generator** that derives:
-  - `tx_enable`: one tick per UART bit time (baud tick)
+  - `tx_en`: one tick per UART bit time (baud tick)
   - `rx_enable`: a faster tick used for receiver oversampling (16x)
 - A **UART transmitter** FSM (`uart_sender`) that frames and serializes a byte:
   - start bit (`0`) -> 8 data bits (LSB first) -> stop bit (`1`)
@@ -42,7 +42,7 @@ Parallel user writes           Serial line                  Parallel received by
 data_in + write_enable --> [ TX FIFO ] --> [ UART TX ] --> tx_line --> [ UART RX ] --> [ RX FIFO ] --> data_out + ready
                                  ^             ^                          ^
                                  |             |                          |
-                             tx_start      tx_enable                   rx_enable
+                             tx_start        tx_en                     rx_enable
                                     \        /
                                  [ baud_rate_generator ]
 ```
@@ -57,7 +57,7 @@ Key integration idea: the transmitter should not depend on how fast the user wri
 
 Rather than trying to count clock cycles inside every UART state machine, the project centralizes timing in `baud_rate_generator`. The TX and RX FSMs only advance when their enable pulse arrives:
 
-- TX changes output only when `tx_enable` pulses (one pulse per bit time).
+- TX changes output only when `tx_en` pulses (one pulse per bit time).
 - RX samples only when `rx_enable` pulses (oversampling tick).
 
 This pattern keeps the FSM logic simple, deterministic, and easy to port to other clock/baud combinations by retuning the divider parameters.

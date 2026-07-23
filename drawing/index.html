@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>UART FSM & Signal Drawings</title>
+  <style>
+    :root{--navy:#002060;--blue:#0563C1;--ink:#17233D;--muted:#5F6B7A;--line:#D9E1F2;--paper:#F5F7FB;--green:#CCFFCC;--yellow:#FFFF99;--red:#B42318}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);color:var(--ink);font-family:Aptos,"Segoe UI",system-ui,sans-serif;line-height:1.55}
+    header{background:var(--navy);color:white;padding:54px max(28px,calc((100vw - 1180px)/2));position:relative;overflow:hidden}header:after{content:"";position:absolute;right:-100px;top:-160px;width:420px;height:420px;border:70px solid rgba(255,255,255,.08);border-radius:50%}
+    .eyebrow{font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:#BBD7FF;font-size:.78rem}h1{font-size:clamp(2.2rem,5vw,4.6rem);line-height:1.02;margin:.35rem 0 1rem;max-width:900px}.lede{font-size:1.12rem;max-width:850px;color:#E3EEFF}
+    nav{position:sticky;top:0;z-index:5;background:rgba(255,255,255,.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}nav div{max-width:1180px;margin:auto;display:flex;gap:10px;padding:11px 24px;overflow:auto}nav a{white-space:nowrap;color:var(--navy);text-decoration:none;font-weight:750;padding:7px 11px;border-radius:8px}nav a:hover{background:#EAF2FF}
+    main{max-width:1180px;margin:0 auto;padding:38px 24px 80px}.verdict{display:grid;grid-template-columns:1.25fr .75fr;gap:24px;background:white;border:1px solid var(--line);border-left:7px solid #16865D;border-radius:16px;padding:25px 28px;box-shadow:0 12px 30px rgba(0,32,96,.07)}.verdict h2{margin:0 0 8px;font-size:1.55rem;color:var(--navy)}.badge{display:inline-block;background:var(--green);color:#07593F;font-weight:850;padding:6px 10px;border-radius:999px;font-size:.82rem}.metric{align-self:center;background:#F1F6FF;border-radius:12px;padding:18px;text-align:center}.metric strong{font-size:2.2rem;color:var(--navy);display:block}.metric span{color:var(--muted)}
+    section{scroll-margin-top:80px;margin-top:34px}.figure{background:white;border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 12px 32px rgba(0,32,96,.06)}.figure-head{padding:25px 28px 0}.figure h2{margin:0;color:var(--navy);font-size:1.65rem}.figure p{color:var(--muted);max-width:900px}.canvas{padding:18px 22px 30px;background:linear-gradient(180deg,#fff,#F8FAFD)}.canvas img{display:block;width:100%;max-height:790px;object-fit:contain}.timing img{max-height:none}
+    .audit{margin-top:34px;background:white;border:1px solid var(--line);border-radius:18px;padding:26px 28px}.audit h2{margin-top:0;color:var(--navy)}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:14px 12px;border-bottom:1px solid #E7EBF2;vertical-align:top}th{color:var(--navy);font-size:.82rem;text-transform:uppercase;letter-spacing:.06em}.pass,.attention{font-weight:850}.pass{color:#087455}.attention{color:#9A5B00}code{background:#EEF3FA;padding:.12rem .35rem;border-radius:5px;color:#153A70}
+    .sources{background:#EAF2FF;border-radius:16px;padding:22px 26px}.sources h2{margin-top:0;color:var(--navy)}.sources a{color:var(--blue)}footer{color:var(--muted);padding-top:30px;font-size:.9rem}
+    @media(max-width:760px){.verdict{grid-template-columns:1fr}header{padding-top:38px}.canvas{padding:8px}th:first-child{width:90px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">UART loopback · verified reference</div>
+    <h1>FSMs, baud enables, and real signal timing</h1>
+    <p class="lede">Drawn from <code>uart_sender.v</code>, <code>uart_receiver.v</code>, <code>baud_rate_generator.v</code>, and <code>uart_top.v</code>. The drawings preserve the RTL’s exact signal names and conditions.</p>
+  </header>
+  <nav><div><a href="#verdict">Verdict</a><a href="#sender">Sender FSM</a><a href="#receiver">Receiver FSM</a><a href="#brg">BRG</a><a href="#signals">Signals</a><a href="#standard">Standard check</a></div></nav>
+  <main>
+    <section id="verdict" class="verdict">
+      <div><span class="badge">FUNCTIONAL LOOPBACK PASS</span><h2>The frame logic is correct; the interface is not production-complete.</h2><p>The current self-checking testbench passes all 12 cases. The line is idle-high, sends one low start bit, eight data bits LSB-first, and one high stop bit. Receiver alignment and midpoint sampling are correct for the implemented 16× enable.</p></div>
+      <div class="metric"><strong>12 / 12</strong><span>current tests passed at 4098 ns</span></div>
+    </section>
+
+    <section id="sender" class="figure"><div class="figure-head"><h2>Sender FSM</h2><p><code>wr_en</code> latches <code>data_in</code>; every serialized phase change is gated by <code>tx_en</code> (connected to <code>tx_clock_enable</code> in the top level).</p></div><div class="canvas"><img src="sender-fsm.svg" alt="UART sender finite-state machine"></div></section>
+    <section id="receiver" class="figure"><div class="figure-head"><h2>Receiver FSM</h2><p>The handwritten sketch’s start-to-data label is corrected here: the start bit is checked at <code>sample == 7</code>. Each data bit and the stop bit are then sampled at <code>sample == 15</code>.</p></div><div class="canvas"><img src="receiver-fsm.svg" alt="UART receiver finite-state machine"></div></section>
+    <section id="brg" class="figure"><div class="figure-head"><h2>Baud-rate generator flow</h2><p>The BRG is not an encoded FSM. It is two independent counters that emit one-system-clock enable pulses: <code>tx_enable</code> once per UART bit and <code>rx_en</code> at the receiver oversampling cadence.</p></div><div class="canvas"><img src="brg-flow.svg" alt="Baud rate generator counter flow"></div></section>
+    <section id="signals" class="figure timing"><div class="figure-head"><h2>Signal timing, styled after the notebook sketch</h2><p>Example byte <code>8'hA5</code>. Red markers show the receiver decision points; the line carries <code>d0</code> first. The page uses internal top-level names such as <code>tx_start</code>, <code>tx_clock_enable</code>, <code>tx_line</code>, <code>rx_en</code>, and <code>rx_byte_ready</code>.</p></div><div class="canvas"><img src="signal-timing.svg" alt="UART timing diagram for data A5"></div></section>
+
+    <section id="standard" class="audit">
+      <h2>Check against conventional UART 8-N-1 behavior</h2>
+      <table>
+        <thead><tr><th>Result</th><th>Item</th><th>Finding</th></tr></thead>
+        <tbody>
+          <tr><td class="pass">PASS</td><td>Frame polarity and order</td><td><code>tx</code>/<code>tx_line</code> is idle-high, start-low, sends <code>data[0]</code> through <code>data[7]</code>, then drives a high stop bit.</td></tr>
+          <tr><td class="pass">PASS</td><td>Receiver timing</td><td>The start bit is rechecked halfway through its cell and later bits are sampled one bit-period apart. That matches the common 16× midpoint method.</td></tr>
+          <tr><td class="attention">ATTENTION</td><td>Top-level interface</td><td><code>uart_top</code> loops <code>tx_line</code> directly into <code>rx_inst.rx</code>; it has no external <code>rx</code> input or <code>tx</code> output, so it is not yet a physical UART top level.</td></tr>
+          <tr><td class="attention">ATTENTION</td><td>Asynchronous RX safety</td><td>There is no two-flop synchronizer before the receiver. The loopback is same-clock, but an external RX pin would need synchronization to reduce metastability risk.</td></tr>
+          <tr><td class="attention">ATTENTION</td><td>Noise and errors</td><td>The receiver takes one sample per bit and silently discards a low stop bit. Production UARTs commonly expose framing/overrun status; many use majority voting around the midpoint.</td></tr>
+          <tr><td class="attention">ATTENTION</td><td><code>busy</code> meaning</td><td>Because <code>busy = (state != IDLE)</code> and STOP transitions to IDLE when the stop level is launched, <code>busy</code> can fall at the beginning of the stop bit rather than after its full duration.</td></tr>
+          <tr><td class="attention">ATTENTION</td><td>Divider parameter widths</td><td><code>tx_counter[12:0]</code> and <code>rx_counter[9:0]</code> fit 5208 and 325, but wider divider parameters would overflow. Deriving widths with <code>$clog2</code> would make the parameters safe.</td></tr>
+          <tr><td class="attention">ATTENTION</td><td>FIFO overflow visibility</td><td>The TX FIFO <code>full</code> output is unused and the RX full condition has no exported overflow flag. Data can be dropped without the user interface reporting it.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="sources"><h2>Engineering references used for the standard check</h2><ul><li><a href="https://docs.amd.com/api/khub/documents/kZgdmmRJRdvf7CGkPHaKSg/content">AMD/Xilinx XAPP341 — UARTs in Xilinx CPLDs</a></li><li><a href="https://docs.amd.com/api/khub/documents/Hi4oaMZcNRihEtKQHzgo1w/content">AMD/Xilinx XAPP223 — 200 MHz UART with Internal 16-Byte Buffer</a></li><li><a href="https://onlinedocs.microchip.com/oxy/GUID-A9964E93-D46C-42E6-98D2-4ED783ABB2CE-en-US-2/GUID-7BA3A2AA-EFBF-4C3A-BB96-17B8A413DE69.html">Microchip USART principle of operation</a></li><li><a href="https://onlinedocs.microchip.com/oxy/GUID-0EC909F9-8FB7-46B2-BF4B-05290662B5C3-en-US-12.1.1/GUID-EF70F12B-3E50-4DB6-9045-D9B0DC1CE30E.html">Microchip asynchronous clock recovery</a></li></ul></section>
+    <footer>Editable multi-page source: <code>../sketch.drawio</code> · Generated from the current RTL in this repository.</footer>
+  </main>
+</body>
+</html>

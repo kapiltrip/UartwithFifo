@@ -16,14 +16,14 @@ module uart_receiver (
 
     reg [1:0] state;
     reg [3:0] sample;
-    reg [3:0] index;
+    reg [2:0] index;
     reg [7:0] temp;
 
     always @(posedge clk) begin
         if (rst) begin
             state <= IDLE;
             sample <= 4'd0;
-            index <= 4'd0;
+            index <= 3'd0;
             temp <= 8'd0;
             data_out <= 8'd0;
             rdy <= 1'b0;
@@ -36,7 +36,7 @@ module uart_receiver (
                 case (state)
                     IDLE: begin
                         sample <= 4'd0;
-                        index <= 4'd0;
+                        index <= 3'd0;
                         if (rx == 1'b0) begin
                             state <= START;
                         end
@@ -49,7 +49,7 @@ module uart_receiver (
                         if (sample == 4'd7) begin
                             if (rx == 1'b0) begin
                                 sample <= 4'd0;
-                                index <= 4'd0;
+                                index <= 3'd0;
                                 temp <= 8'd0;
                                 state <= DATA;
                             end else begin
@@ -65,11 +65,11 @@ module uart_receiver (
                         // After start-bit alignment, sample each data bit once per bit period.
                         if (sample == 4'd15) begin
                             sample <= 4'd0;
-                            temp[index[2:0]] <= rx;
-                            if (index == 4'd7) begin
+                            temp[index] <= rx;
+                            if (index == 3'd7) begin
                                 state <= STOP;
                             end else begin
-                                index <= index + 4'd1;
+                                index <= index + 3'd1;
                             end
                         end
                     end
@@ -89,7 +89,7 @@ module uart_receiver (
                     default: begin
                         state <= IDLE;
                         sample <= 4'd0;
-                        index <= 4'd0;
+                        index <= 3'd0;
                     end
                 endcase
             end

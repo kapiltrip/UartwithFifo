@@ -3,7 +3,7 @@
 module baud_rate_generator (
     input clk,
     input reset,
-    output reg tx_enable,
+    output reg tx_en,
     output reg rx_en
 );
     parameter integer TX_DIV = 5208;
@@ -15,13 +15,13 @@ module baud_rate_generator (
     always @(posedge clk) begin
         if (reset) begin
             tx_counter <= 13'd0;
-            tx_enable <= 1'b0;
+            tx_en <= 1'b0;
         end else if (tx_counter == (TX_DIV - 1)) begin
             tx_counter <= 13'd0;
-            tx_enable <= 1'b1;
+            tx_en <= 1'b1;
         end else begin
             tx_counter <= tx_counter + 13'd1;
-            tx_enable <= 1'b0;
+            tx_en <= 1'b0;
         end
     end
 

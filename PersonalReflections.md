@@ -37,7 +37,7 @@ Here, I am trying to document all the doubts, that I had with answers, as well ,
 
 ### Q5) What are the main modules in your project and what does each do?
 **A:**  
-- `baud_rate_generator.v`: produces `tx_enable` (baud tick) and `rx_enable` (oversampling tick).  
+- `baud_rate_generator.v`: produces `tx_en` (baud tick) and `rx_enable` (oversampling tick).
 - `uart_sender.v`: TX FSM that emits start/data/stop on `tx`.  
 - `uart_receiver.v`: RX FSM that oversamples `rx`, reconstructs the byte, asserts `ready`.  
 - `uart_fifo.v`: 16‑deep TX FIFO buffering user writes.  
@@ -54,7 +54,7 @@ Here, I am trying to document all the doubts, that I had with answers, as well ,
 
 ## Baud Rate Generator (Timing)
 
-### Q8) Why did you create `tx_enable` and `rx_enable` instead of directly using the clock?
+### Q8) Why did you create `tx_en` and `rx_enable` instead of directly using the clock?
 **A:** UART needs actions at the **baud rate** (TX) and at a **multiple of it** (RX oversampling). Generating one-cycle enable pulses keeps the TX/RX FSMs simple: they only advance when the tick arrives.
 
 ### Q9) How do you choose `TX_DIV` and what does it represent?
@@ -63,8 +63,8 @@ Here, I am trying to document all the doubts, that I had with answers, as well ,
 ### Q10) What is `RX_DIV` and why is it smaller?
 **A:** `RX_DIV` creates the oversampling tick. With 16x oversampling, `RX_DIV` is about `TX_DIV / 16`. In this project it's set to `325`.
 
-### Q11) What does it mean that `tx_enable` is a “1-cycle pulse”?
-**A:** It means `tx_enable` goes high for exactly one `clk` cycle each time the counter reaches its terminal value. The TX FSM uses that pulse as “advance one UART bit.”
+### Q11) What does it mean that `tx_en` is a “1-cycle pulse”?
+**A:** It means `tx_en` goes high for exactly one `clk` cycle each time the counter reaches its terminal value. The TX FSM uses that pulse as “advance one UART bit.”
 
 ### Q12) What happens if the baud rate divisor is slightly off?
 **A:** The transmitter bit times shift slightly, and the receiver sampling point can drift. In this project, TX and RX are driven by the same generator (loopback), so they remain coherent. In a real link, small mismatch must still be tolerated by oversampling and mid-bit sampling.
@@ -74,7 +74,7 @@ Here, I am trying to document all the doubts, that I had with answers, as well ,
 ## UART Transmitter (`uart_sender.v`)
 
 ### Q13) Walk me through the TX frame your transmitter sends.
-**A:** In `IDLE`, the line is high. When `write_enable` is asserted, the byte is latched and the FSM goes to `START`. On the next `tx_enable`, it drives `0` for the start bit. Then it outputs 8 data bits LSB-first in `DATA`, and finally outputs `1` for the stop bit in `STOP`, returning to `IDLE`.
+**A:** In `IDLE`, the line is high. When `write_enable` is asserted, the byte is latched and the FSM goes to `START`. On the next `tx_en`, it drives `0` for the start bit. Then it outputs 8 data bits LSB-first in `DATA`, and finally outputs `1` for the stop bit in `STOP`, returning to `IDLE`.
 
 ### Q14) Why do you latch `data_in` into an internal `data` register?
 **A:** To prevent the transmitted byte from changing mid-frame if `data_in` changes later. Latching makes transmission stable and deterministic.
@@ -83,7 +83,7 @@ Here, I am trying to document all the doubts, that I had with answers, as well ,
 **A:** `busy` is asserted whenever the TX FSM is not in `IDLE`. It indicates the transmitter is currently sending a frame (or preparing to).
 
 ### Q16) When does `tx` actually change?
-**A:** Only on `tx_enable` pulses (baud ticks). That enforces a stable bit value for the whole bit period.
+**A:** Only on `tx_en` pulses (baud ticks). That enforces a stable bit value for the whole bit period.
 
 ---
 
